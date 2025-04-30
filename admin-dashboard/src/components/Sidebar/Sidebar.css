@@ -1,0 +1,124 @@
+.sidebar {
+  width: 250px;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.sidebar-logo {
+  height: 30px;
+  width: auto;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding-top: 10px;
+}
+
+.sidebar-nav ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav li {
+  padding: 15px 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  border-left: 4px solid transparent;
+  margin-bottom: 5px;
+}
+
+.sidebar-nav li:hover {
+  background-color: #f0f4f9;
+  border-left: 4px solid #4527a0;
+  transform: translateX(3px);
+}
+
+.sidebar-nav li.active {
+  background-color: #5e35b1;
+  color: white;
+  border-left: 4px solid #3a1e8c;
+}
+
+.icon {
+  margin-right: 12px;
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-color: #ccc; /* Placeholder for icons */
+  border-radius: 4px;
+}
+
+.sidebar-footer {
+  padding: 15px 20px;
+  border-top: 1px solid #eaeaea;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background-color: #5e35b1;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.user-info {
+  overflow: hidden;
+}
+
+.user-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-btn {
+  margin-top: 15px;
+  width: 100%;
+  padding: 10px;
+  background-color: #f0f2f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #333;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: #e4e6eb;
+  border-color: #c8cacc;
+}
