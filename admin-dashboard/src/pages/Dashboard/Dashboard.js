@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar/SideBar';
+import dataService from '../../services/dataService';
 import './Dashboard.css';
 
 const Dashboard = ({ onLogout, onNavigate, activePage }) => {
+  const [stats, setStats] = useState({
+    totalPatients: 0,
+    activeAppointments: 0,
+    treatmentSuccess: 0,
+    pendingReports: 0
+  });
+  const [recentActivity, setRecentActivity] = useState([]);
+
   // Placeholder data for dashboard
   const userData = {
     name: "Nhyiraba David",
@@ -10,27 +19,76 @@ const Dashboard = ({ onLogout, onNavigate, activePage }) => {
     email: "davidnhyiraba@gmail.com",
   };
 
-  const stats = [
-    { id: 1, title: "Total Patients", value: "1,243", change: "+12%" },
-    { id: 2, title: "Active Appointments", value: "78", change: "+5%" },
-    { id: 3, title: "Treatment Success", value: "92%", change: "+3%" },
-    { id: 4, title: "Pending Reports", value: "7", change: "-2%" },
-  ];
+  // Load dashboard data
+  useEffect(() => {
+    const loadDashboardData = () => {
+      // Get stats from dataService
+      const dashboardStats = dataService.dashboard.getStats();
+      setStats(dashboardStats);
 
-  const recentActivity = [
-    { id: 1, action: "Patient Check-in", user: "Sarah Johnson", time: "10 minutes ago" },
-    { id: 2, action: "Medical Record Updated", user: "Mike Smith", time: "1 hour ago" },
-    { id: 3, action: "Prescription Issued", user: "Lisa Chen", time: "3 hours ago" },
-    { id: 4, action: "New Patient Registration", user: "Robert Davis", time: "Yesterday" },
+      // Get recent activity
+      const activity = dataService.dashboard.getRecentActivity();
+      setRecentActivity(activity);
+    };
+
+    loadDashboardData();
+  }, []);
+
+  // Format time ago
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now - date;
+    const diffInMins = Math.floor(diffInMs / 60000);
+    const diffInHours = Math.floor(diffInMs / 3600000);
+    const diffInDays = Math.floor(diffInMs / 86400000);
+
+    if (diffInMins < 1) return 'Just now';
+    if (diffInMins < 60) return `${diffInMins} minute${diffInMins > 1 ? 's' : ''} ago`;
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  const statsData = [
+    {
+      id: 1,
+      title: "Total Patients",
+      value: stats.totalPatients.toLocaleString(),
+      change: "+12%",
+      isPositive: true
+    },
+    {
+      id: 2,
+      title: "Active Appointments",
+      value: stats.activeAppointments,
+      change: "+5%",
+      isPositive: true
+    },
+    {
+      id: 3,
+      title: "Treatment Success",
+      value: `${stats.treatmentSuccess}%`,
+      change: "+3%",
+      isPositive: true
+    },
+    {
+      id: 4,
+      title: "Pending Reports",
+      value: stats.pendingReports,
+      change: "-2%",
+      isPositive: false
+    },
   ];
 
   return (
     <div className="dashboard-container">
-      <Sidebar 
-        activePage={activePage} 
-        onNavigate={onNavigate} 
-        userData={userData} 
-        onLogout={onLogout} 
+      <Sidebar
+        activePage={activePage}
+        onNavigate={onNavigate}
+        userData={userData}
+        onLogout={onLogout}
       />
 
       {/* Main Content */}
@@ -39,21 +97,21 @@ const Dashboard = ({ onLogout, onNavigate, activePage }) => {
         <div className="top-bar">
           <h1>Dashboard</h1>
           <div className="top-bar-actions">
-            
+
             <div className="search-container">
               <input type="text" placeholder="Search..." className="search-input" />
-             
+
             </div>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="stats-container">
-          {stats.map(stat => (
-            <div className="stat-card" key={stat.id}>
+          {statsData.map((stat) => (
+            <div key={stat.id} className="stat-card">
               <h3 className="stat-title">{stat.title}</h3>
               <p className="stat-value">{stat.value}</p>
-              <p className={`stat-change ${stat.change.includes('+') ? 'positive' : 'negative'}`}>
+              <p className={`stat-change ${stat.isPositive ? 'positive' : 'negative'}`}>
                 {stat.change}
               </p>
             </div>
@@ -64,7 +122,9 @@ const Dashboard = ({ onLogout, onNavigate, activePage }) => {
         <div className="section">
           <div className="section-header">
             <h2>Recent Activity</h2>
-            <button className="view-all-btn">View All</button>
+            <button className="view-all-btn" onClick={() => onNavigate('patients')}>
+              View All
+            </button>
           </div>
           <div className="activity-list">
             <table>
@@ -73,15 +133,15 @@ const Dashboard = ({ onLogout, onNavigate, activePage }) => {
                   <th>Action</th>
                   <th>User</th>
                   <th>Time</th>
-                  <th></th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {recentActivity.map(activity => (
-                  <tr key={activity.id}>
+                {recentActivity.map((activity, index) => (
+                  <tr key={index}>
                     <td>{activity.action}</td>
                     <td>{activity.user}</td>
-                    <td>{activity.time}</td>
+                    <td>{formatTimeAgo(activity.time)}</td>
                     <td>
                       <button className="details-btn">Details</button>
                     </td>

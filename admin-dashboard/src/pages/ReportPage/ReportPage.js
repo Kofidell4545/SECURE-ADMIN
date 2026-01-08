@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar/SideBar';
+import Modal from '../../components/Modal/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import dataService from '../../services/dataService';
 import './ReportPage.css';
 
 const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
@@ -9,446 +13,462 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     email: "davidnhyiraba@gmail.com",
   };
 
-  // Sample patient data
-  const [patients, setPatients] = useState([
-    { 
-      id: 1, 
-      name: "Emma Thompson", 
-      age: 34,
-      gender: "Female",
-      bloodType: "A+",
-      condition: "Regular Checkup",
-      lastVisit: "15 April 2025"
-    },
-    { 
-      id: 2, 
-      name: "James Peterson", 
-      age: 45,
-      gender: "Male",
-      bloodType: "O-",
-      condition: "Hypertension Follow-up",
-      lastVisit: "10 April 2025"
-    },
-    { 
-      id: 3, 
-      name: "Sophia Martinez", 
-      age: 28,
-      gender: "Female",
-      bloodType: "B+",
-      condition: "Pregnancy Check",
-      lastVisit: "12 April 2025"
-    },
-    { 
-      id: 4, 
-      name: "Michael Chen", 
-      age: 52,
-      gender: "Male",
-      bloodType: "AB-",
-      condition: "Diabetes Management",
-      lastVisit: "8 April 2025"
-    },
-    { 
-      id: 5, 
-      name: "Olivia Wilson", 
-      age: 19,
-      gender: "Female",
-      bloodType: "O+",
-      condition: "Annual Physical",
-      lastVisit: "5 April 2025"
-    }
-  ]);
-
-  // Sample report data
-  const [reports, setReports] = useState({
-    1: { // Patient ID
-      "Clinical Reports": [
-        { id: 101, title: "Annual Physical Examination", date: "15 April 2025", author: "Dr. Sarah Williams" },
-        { id: 102, title: "Follow-up Consultation", date: "1 March 2025", author: "Dr. Nhyiraba David" }
-      ],
-      "Diagnostic Reports": [
-        { id: 201, title: "Blood Test Results", date: "15 April 2025", author: "Lab Technician John Smith" },
-        { id: 202, title: "Chest X-Ray Analysis", date: "10 February 2025", author: "Dr. Patricia Lee" }
-      ],
-      "Therapeutic Reports": [],
-      "Legal Medical Reports": [],
-      "Specialty Reports": [
-        { id: 501, title: "Cardiology Assessment", date: "20 January 2025", author: "Dr. Michael Rodriguez" }
-      ]
-    },
-    2: {
-      "Clinical Reports": [
-        { id: 103, title: "Hypertension Follow-up", date: "10 April 2025", author: "Dr. Nhyiraba David" }
-      ],
-      "Diagnostic Reports": [
-        { id: 203, title: "Blood Pressure Monitoring", date: "10 April 2025", author: "Nurse Jessica Thompson" },
-        { id: 204, title: "ECG Analysis", date: "10 April 2025", author: "Dr. Elizabeth Chen" }
-      ],
-      "Therapeutic Reports": [
-        { id: 301, title: "Medication Review", date: "10 April 2025", author: "Dr. Nhyiraba David" }
-      ],
-      "Legal Medical Reports": [],
-      "Specialty Reports": []
-    },
-    3: {
-      "Clinical Reports": [
-        { id: 104, title: "Prenatal Checkup", date: "12 April 2025", author: "Dr. Lisa Johnson" }
-      ],
-      "Diagnostic Reports": [
-        { id: 205, title: "Ultrasound Report", date: "12 April 2025", author: "Dr. Lisa Johnson" }
-      ],
-      "Therapeutic Reports": [],
-      "Legal Medical Reports": [],
-      "Specialty Reports": [
-        { id: 502, title: "Obstetrics Assessment", date: "12 April 2025", author: "Dr. Lisa Johnson" }
-      ]
-    }
+  const [patients, setPatients] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [formData, setFormData] = useState({
+    patientId: '',
+    title: '',
+    category: 'Clinical Reports',
+    date: new Date().toISOString().split('T')[0],
+    author: userData.name,
+    fileName: '',
+    fileType: 'pdf',
+    notes: '',
   });
 
-  // State for views
-  const [view, setView] = useState('list'); // 'list', 'view', 'upload'
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [uploadCategory, setUploadCategory] = useState('');
-  const [reportContent, setReportContent] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  
+  const { showSuccess, showError } = useToast();
+
   // Report categories
   const categories = [
-    "Clinical Reports", 
-    "Diagnostic Reports", 
-    "Therapeutic Reports", 
-    "Legal Medical Reports", 
-    "Specialty Reports"
+    'All',
+    'Clinical Reports',
+    'Diagnostic Reports',
+    'Therapeutic Reports',
+    'Legal Medical Reports',
+    'Specialty Reports'
   ];
 
-  // Handler for viewing reports
-  const handleViewReports = (patient) => {
-    setSelectedPatient(patient);
-    setView('view');
+  // Load data on mount
+  useEffect(() => {
+    loadPatients();
+    loadReports();
+  }, []);
+
+  const loadPatients = () => {
+    const allPatients = dataService.patient.getAll();
+    setPatients(allPatients);
   };
 
-  // Handler for uploading reports
-  const handleUploadReports = (patient) => {
-    setSelectedPatient(patient);
-    setView('upload');
-    setUploadCategory('');
-    setReportContent('');
-    setSelectedFile(null);
+  const loadReports = () => {
+    const allReports = dataService.report.getAll();
+    setReports(allReports);
   };
 
-  // Handler for saving the report
-  const handleSaveReport = () => {
-    if (!uploadCategory) {
-      alert('Please select a category');
+  const handleUploadReport = (patient = null) => {
+    setFormData({
+      patientId: patient ? patient.id : '',
+      title: '',
+      category: 'Clinical Reports',
+      date: new Date().toISOString().split('T')[0],
+      author: userData.name,
+      fileName: '',
+      fileType: 'pdf',
+      notes: '',
+    });
+    setSelectedPatient(patient);
+    setShowUploadModal(true);
+  };
+
+  const handleViewReport = (report) => {
+    setSelectedReport(report);
+    setShowViewModal(true);
+  };
+
+  const handleDeleteReport = (report) => {
+    setSelectedReport(report);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (selectedReport) {
+      const success = dataService.report.delete(selectedReport.id);
+      if (success) {
+        showSuccess('Report deleted successfully');
+        loadReports();
+      } else {
+        showError('Failed to delete report');
+      }
+    }
+    setShowDeleteDialog(false);
+    setSelectedReport(null);
+  };
+
+  const handleSubmitReport = (e) => {
+    e.preventDefault();
+
+    // Validate required fields
+    if (!formData.patientId || !formData.title || !formData.category) {
+      showError('Please fill in all required fields');
       return;
     }
 
-    // Create a new report object
-    const newReport = {
-      id: Date.now(), // Generate a unique ID
-      title: selectedFile ? selectedFile.name : "Text Report",
-      date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
-      author: userData.name,
-      content: reportContent
-    };
-
-    // Update reports state
-    setReports(prevReports => {
-      const patientReports = prevReports[selectedPatient.id] || {
-        "Clinical Reports": [],
-        "Diagnostic Reports": [],
-        "Therapeutic Reports": [],
-        "Legal Medical Reports": [],
-        "Specialty Reports": []
-      };
-
-      return {
-        ...prevReports,
-        [selectedPatient.id]: {
-          ...patientReports,
-          [uploadCategory]: [...(patientReports[uploadCategory] || []), newReport]
-        }
-      };
-    });
-
-    // Show success message
-    alert('Report saved successfully!');
-    
-    // Reset form
-    setUploadCategory('');
-    setReportContent('');
-    setSelectedFile(null);
-    
-    // Return to list view
-    setView('list');
+    const newReport = dataService.report.add(formData);
+    showSuccess(`Report "${newReport.title}" uploaded successfully`);
+    loadReports();
+    setShowUploadModal(false);
   };
 
-  // Handler for file selection
-  const handleFileChange = (event) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('image') ? 'image' : 'text';
+      setFormData(prev => ({
+        ...prev,
+        fileName: file.name,
+        fileType: fileType,
+        title: prev.title || file.name.replace(/\.[^/.]+$/, "")
+      }));
     }
   };
 
-  // Render back button
-  const renderBackButton = () => (
-    <button 
-      className="back-button"
-      onClick={() => {
-        setView('list');
-        setSelectedPatient(null);
-      }}
-    >
-      <i className="icon back-icon"></i> Back to Reports List
-    </button>
-  );
-
-  // Render the list view
-  const renderListView = () => (
-    <>
-      <div className="section-header">
-        <h2>Patient Reports</h2>
-        <div className="search-container">
-          <input type="text" placeholder="Search patients..." className="search-input" />
-         
-        </div>
-      </div>
-
-      <div className="reports-table-container">
-        <table className="reports-table">
-          <thead>
-            <tr>
-              <th>Patient Name</th>
-              <th>Age</th>
-              <th>Last Visit</th>
-              <th>Condition</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map(patient => (
-              <tr key={patient.id}>
-                <td>{patient.name}</td>
-                <td>{patient.age}</td>
-                <td>{patient.lastVisit}</td>
-                <td>{patient.condition}</td>
-                <td>
-                  <div className="action-buttons">
-                    <button 
-                      className="view-btn"
-                      onClick={() => handleViewReports(patient)}
-                    >
-                      View Reports
-                    </button>
-                    <button 
-                      className="upload-btn"
-                      onClick={() => handleUploadReports(patient)}
-                    >
-                      Upload Report
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-
-  // Render the view reports view
-  const renderViewReportsView = () => {
-    const patientReports = reports[selectedPatient.id] || {};
-    
-    return (
-      <>
-        {renderBackButton()}
-        
-        <div className="patient-info-card">
-          <h2>{selectedPatient.name}'s Reports</h2>
-          <div className="patient-details">
-            <div className="detail-item">
-              <span className="detail-label">Age:</span>
-              <span className="detail-value">{selectedPatient.age}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Gender:</span>
-              <span className="detail-value">{selectedPatient.gender}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Blood Type:</span>
-              <span className="detail-value">{selectedPatient.bloodType}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Condition:</span>
-              <span className="detail-value">{selectedPatient.condition}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="reports-categories">
-          {categories.map(category => {
-            const categoryReports = patientReports[category] || [];
-            return (
-              <div key={category} className="report-category">
-                <h3>{category}</h3>
-                {categoryReports.length > 0 ? (
-                  <div className="category-reports">
-                    {categoryReports.map(report => (
-                      <div key={report.id} className="report-item">
-                        <div className="report-title">{report.title}</div>
-                        <div className="report-meta">
-                          <span>{report.date}</span>
-                          <span> | </span>
-                          <span>{report.author}</span>
-                        </div>
-                        <button className="view-report-btn">Open Report</button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="no-reports">No reports in this category</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
+  const getPatientName = (patientId) => {
+    const patient = dataService.patient.getById(patientId);
+    return patient ? patient.name : 'Unknown Patient';
   };
 
-  // Render the upload report view
-  const renderUploadReportView = () => (
-    <>
-      {renderBackButton()}
-      
-      <div className="patient-info-card">
-        <h2>Upload Report for {selectedPatient.name}</h2>
-        <div className="patient-details">
-          <div className="detail-item">
-            <span className="detail-label">Age:</span>
-            <span className="detail-value">{selectedPatient.age}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Gender:</span>
-            <span className="detail-value">{selectedPatient.gender}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Blood Type:</span>
-            <span className="detail-value">{selectedPatient.bloodType}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Condition:</span>
-            <span className="detail-value">{selectedPatient.condition}</span>
-          </div>
-        </div>
-      </div>
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
 
-      <div className="upload-form">
-        <div className="form-group">
-          <label htmlFor="category-select">Select Report Category:</label>
-          {!uploadCategory ? (
-            <div className="category-buttons">
-              {categories.map(category => (
-                <button 
-                  key={category} 
-                  className="category-button"
-                  onClick={() => setUploadCategory(category)}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="selected-category">
-              <p>{uploadCategory}</p>
-              <button 
-                className="change-category"
-                onClick={() => setUploadCategory('')}
-              >
-                Change
-              </button>
-            </div>
-          )}
-        </div>
+  const getFilteredReports = () => {
+    let filtered = reports;
 
-        {uploadCategory && (
-          <>
-            <div className="form-group">
-              <label htmlFor="file-upload">Upload File:</label>
-              <div className="file-upload-container">
-                <input 
-                  type="file" 
-                  id="file-upload" 
-                  onChange={handleFileChange}
-                  className="file-input"
-                />
-                <div className="file-upload-label">
-                  {selectedFile ? selectedFile.name : "Choose file"}
-                </div>
-              </div>
-            </div>
+    // Filter by category
+    if (selectedCategory !== 'All') {
+      filtered = filtered.filter(r => r.category === selectedCategory);
+    }
 
-            <div className="form-group">
-              <label htmlFor="report-content">Report Notes:</label>
-              <textarea 
-                id="report-content"
-                value={reportContent}
-                onChange={(e) => setReportContent(e.target.value)}
-                placeholder="Enter additional notes or transcribe report content here..."
-                rows={6}
-                className="report-textarea"
-              />
-            </div>
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r => {
+        const patientName = getPatientName(r.patientId).toLowerCase();
+        return (
+          r.title.toLowerCase().includes(query) ||
+          patientName.includes(query) ||
+          r.category.toLowerCase().includes(query)
+        );
+      });
+    }
 
-            <div className="form-actions">
-              <button 
-                className="cancel-btn"
-                onClick={() => setView('list')}
-              >
-                Cancel
-              </button>
-              <button 
-                className="save-btn"
-                onClick={handleSaveReport}
-              >
-                Save Report
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </>
-  );
+    return filtered;
+  };
+
+  const filteredReports = getFilteredReports();
 
   return (
     <div className="dashboard-container">
-      <Sidebar 
-        activePage={activePage} 
-        onNavigate={onNavigate} 
-        userData={userData} 
-        onLogout={onLogout} 
+      <Sidebar
+        activePage={activePage}
+        onNavigate={onNavigate}
+        userData={userData}
+        onLogout={onLogout}
       />
 
-      {/* Main Content */}
       <main className="main-content">
         {/* Top Bar */}
         <div className="top-bar">
-          <h1>Reports</h1>
+          <h1>Medical Reports</h1>
           <div className="top-bar-actions">
-            
             <div className="search-container">
-              
+              <input
+                type="text"
+                placeholder="Search reports..."
+                className="search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
+            <button className="add-btn" onClick={() => handleUploadReport()}>
+              + Upload Report
+            </button>
           </div>
         </div>
 
-        {/* Reports Section */}
-        <div className="section reports-section">
-          {view === 'list' && renderListView()}
-          {view === 'view' && selectedPatient && renderViewReportsView()}
-          {view === 'upload' && selectedPatient && renderUploadReportView()}
+        {/* Category Filter */}
+        <div className="filters-bar">
+          <div className="category-tabs">
+            {categories.map(category => (
+              <button
+                key={category}
+                className={`category-tab ${selectedCategory === category ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(category)}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          <div className="results-count">
+            Showing {filteredReports.length} of {reports.length} reports
+          </div>
+        </div>
+
+        {/* Reports Table */}
+        <div className="section">
+          <div className="reports-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Patient</th>
+                  <th>Category</th>
+                  <th>Date</th>
+                  <th>Author</th>
+                  <th>Type</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReports.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="no-data">
+                      {searchQuery || selectedCategory !== 'All'
+                        ? 'No reports found matching your criteria'
+                        : 'No reports yet. Click "Upload Report" to add one.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredReports.map((report) => (
+                    <tr key={report.id}>
+                      <td className="report-title">{report.title}</td>
+                      <td>{getPatientName(report.patientId)}</td>
+                      <td>
+                        <span className="category-badge">
+                          {report.category}
+                        </span>
+                      </td>
+                      <td>{formatDate(report.date)}</td>
+                      <td>{report.author}</td>
+                      <td>
+                        <span className={`file-type-badge file-${report.fileType}`}>
+                          {report.fileType.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="action-buttons">
+                        <button
+                          className="action-btn view-btn"
+                          onClick={() => handleViewReport(report)}
+                          title="View Report"
+                        >
+                          View
+                        </button>
+                        <button
+                          className="action-btn delete-btn"
+                          onClick={() => handleDeleteReport(report)}
+                          title="Delete Report"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
+
+      {/* Upload Report Modal */}
+      <Modal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        title="Upload Medical Report"
+        size="large"
+      >
+        <form onSubmit={handleSubmitReport} className="report-form">
+          <div className="form-grid">
+            <div className="form-group full-width">
+              <label>Select Patient *</label>
+              <select
+                name="patientId"
+                value={formData.patientId}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">-- Select a patient --</option>
+                {patients.map(patient => (
+                  <option key={patient.id} value={patient.id}>
+                    {patient.name} - {patient.age} years - {patient.npi}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Report Category *</label>
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleInputChange}
+                required
+              >
+                {categories.filter(c => c !== 'All').map(category => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Report Date *</label>
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Report Title *</label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                required
+                placeholder="e.g., Annual Physical Examination"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Upload File (Optional)</label>
+              <div className="file-upload-area">
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  className="file-input-hidden"
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="file-upload-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  <span>{formData.fileName || 'Choose file to upload'}</span>
+                </label>
+                <p className="file-hint">Supported: PDF, JPG, PNG, DOC (Max 10MB)</p>
+              </div>
+            </div>
+
+            <div className="form-group full-width">
+              <label>Report Notes</label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows="4"
+                placeholder="Additional notes or observations..."
+              />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={() => setShowUploadModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary">
+              Upload Report
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* View Report Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => setShowViewModal(false)}
+        title="Report Details"
+        size="large"
+      >
+        {selectedReport && (
+          <div className="report-details">
+            <div className="details-grid">
+              <div className="detail-item">
+                <label>Title:</label>
+                <span>{selectedReport.title}</span>
+              </div>
+              <div className="detail-item">
+                <label>Patient:</label>
+                <span>{getPatientName(selectedReport.patientId)}</span>
+              </div>
+              <div className="detail-item">
+                <label>Category:</label>
+                <span className="category-badge">{selectedReport.category}</span>
+              </div>
+              <div className="detail-item">
+                <label>Date:</label>
+                <span>{formatDate(selectedReport.date)}</span>
+              </div>
+              <div className="detail-item">
+                <label>Author:</label>
+                <span>{selectedReport.author}</span>
+              </div>
+              <div className="detail-item">
+                <label>File Type:</label>
+                <span className={`file-type-badge file-${selectedReport.fileType}`}>
+                  {selectedReport.fileType.toUpperCase()}
+                </span>
+              </div>
+              {selectedReport.fileName && (
+                <div className="detail-item full-width">
+                  <label>File Name:</label>
+                  <span>{selectedReport.fileName}</span>
+                </div>
+              )}
+              {selectedReport.notes && (
+                <div className="detail-item full-width">
+                  <label>Notes:</label>
+                  <span>{selectedReport.notes}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowViewModal(false)}>
+                Close
+              </button>
+              <button className="btn-primary">
+                Download Report
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={confirmDelete}
+        title="Delete Report"
+        message={`Are you sure you want to delete "${selectedReport?.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar/SideBar';
+import Modal from '../../components/Modal/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import dataService from '../../services/dataService';
 import './PatientPage.css';
 
 const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
@@ -9,174 +13,708 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
     email: "davidnhyiraba@gmail.com",
   };
 
-  // Sample patient data
-  const [patients, setPatients] = useState([
-    { 
-      id: 1, 
-      name: "Emma Thompson", 
-      appointmentTime: "09:30 AM, Today", 
-      status: "Checked In",
-      age: 34,
-      condition: "Regular Checkup"
-    },
-    { 
-      id: 2, 
-      name: "James Peterson", 
-      appointmentTime: "10:15 AM, Today", 
-      status: "Waiting",
-      age: 45,
-      condition: "Hypertension Follow-up"
-    },
-    { 
-      id: 3, 
-      name: "Sophia Martinez", 
-      appointmentTime: "11:00 AM, Today", 
-      status: "In Treatment",
-      age: 28,
-      condition: "Pregnancy Check"
-    },
-    { 
-      id: 4, 
-      name: "Michael Chen", 
-      appointmentTime: "12:30 PM, Today", 
-      status: "Scheduled",
-      age: 52,
-      condition: "Diabetes Management"
-    },
-    { 
-      id: 5, 
-      name: "Olivia Wilson", 
-      appointmentTime: "01:45 PM, Today", 
-      status: "Scheduled",
-      age: 19,
-      condition: "Annual Physical"
-    },
-    { 
-      id: 6, 
-      name: "Robert Garcia", 
-      appointmentTime: "03:00 PM, Today", 
-      status: "Cancelled",
-      age: 67,
-      condition: "Cardiac Assessment"
-    },
-    { 
-      id: 7, 
-      name: "Ava Johnson", 
-      appointmentTime: "09:15 AM, Tomorrow", 
-      status: "Scheduled",
-      age: 5,
-      condition: "Pediatric Checkup"
-    },
-    { 
-      id: 8, 
-      name: "William Brown", 
-      appointmentTime: "10:45 AM, Tomorrow", 
-      status: "Scheduled",
-      age: 39,
-      condition: "Physical Therapy"
-    }
-  ]);
-
-  // Filter patients by status
+  const [patients, setPatients] = useState([]);
+  const [filteredPatients, setFilteredPatients] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    age: '',
+    gender: 'Male',
+    bloodType: 'A+',
+    npi: '',
+    email: '',
+    phone: '',
+    address: '',
+    medicalHistory: '',
+    allergies: '',
+    currentMedications: '',
+  });
 
-  const filteredPatients = statusFilter === 'All' 
-    ? patients 
-    : patients.filter(patient => patient.status === statusFilter);
+  const { showSuccess, showError } = useToast();
 
-  // Get unique statuses for filter options
-  const statuses = ['All', ...new Set(patients.map(patient => patient.status))];
+  // Load patients on mount
+  useEffect(() => {
+    loadPatients();
+  }, []);
+
+  // Filter patients when search or filter changes
+  useEffect(() => {
+    filterPatients();
+  }, [patients, searchQuery, statusFilter]);
+
+  const loadPatients = () => {
+    const allPatients = dataService.patient.getAll();
+    setPatients(allPatients);
+  };
+
+  const filterPatients = () => {
+    let filtered = patients;
+
+    // Apply status filter
+    if (statusFilter !== 'All') {
+      filtered = filtered.filter(p => p.status === statusFilter);
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.email.toLowerCase().includes(query) ||
+        p.npi.includes(query)
+      );
+    }
+
+    setFilteredPatients(filtered);
+  };
+
+  const handleAddPatient = () => {
+    setFormData({
+      name: '',
+      age: '',
+      gender: 'Male',
+      bloodType: 'A+',
+      npi: '',
+      email: '',
+      phone: '',
+      address: '',
+      medicalHistory: '',
+      allergies: '',
+      currentMedications: '',
+    });
+    setShowAddModal(true);
+  };
+
+  const handleEditPatient = (patient) => {
+    setSelectedPatient(patient);
+    setFormData({
+      name: patient.name,
+      age: patient.age,
+      gender: patient.gender,
+      bloodType: patient.bloodType,
+      npi: patient.npi,
+      email: patient.email,
+      phone: patient.phone,
+      address: patient.address,
+      medicalHistory: patient.medicalHistory || '',
+      allergies: Array.isArray(patient.allergies) ? patient.allergies.join(', ') : '',
+      currentMedications: Array.isArray(patient.currentMedications) ? patient.currentMedications.join(', ') : '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleViewPatient = (patient) => {
+    setSelectedPatient(patient);
+    setShowViewModal(true);
+  };
+
+  const handleDeletePatient = (patient) => {
+    setSelectedPatient(patient);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (selectedPatient) {
+      const success = dataService.patient.delete(selectedPatient.id);
+      if (success) {
+        showSuccess(`Patient ${selectedPatient.name} deleted successfully`);
+        loadPatients();
+      } else {
+        showError('Failed to delete patient');
+      }
+    }
+    setShowDeleteDialog(false);
+    setSelectedPatient(null);
+  };
+
+  const handleSubmitAdd = (e) => {
+    e.preventDefault();
+
+    // Validate required fields
+    if (!formData.name || !formData.age || !formData.email || !formData.npi) {
+      showError('Please fill in all required fields');
+      return;
+    }
+
+    // Prepare patient data
+    const patientData = {
+      ...formData,
+      age: parseInt(formData.age),
+      allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()) : [],
+      currentMedications: formData.currentMedications ? formData.currentMedications.split(',').map(m => m.trim()) : [],
+      lastVisit: new Date().toISOString(),
+      nextAppointment: null,
+    };
+
+    const newPatient = dataService.patient.add(patientData);
+    showSuccess(`Patient ${newPatient.name} added successfully`);
+    loadPatients();
+    setShowAddModal(false);
+  };
+
+  const handleSubmitEdit = (e) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.age || !formData.email || !formData.npi) {
+      showError('Please fill in all required fields');
+      return;
+    }
+
+    const updates = {
+      ...formData,
+      age: parseInt(formData.age),
+      allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()) : [],
+      currentMedications: formData.currentMedications ? formData.currentMedications.split(',').map(m => m.trim()) : [],
+    };
+
+    const updated = dataService.patient.update(selectedPatient.id, updates);
+    if (updated) {
+      showSuccess(`Patient ${updated.name} updated successfully`);
+      loadPatients();
+      setShowEditModal(false);
+    } else {
+      showError('Failed to update patient');
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
 
   return (
     <div className="dashboard-container">
-      <Sidebar 
-        activePage={activePage} 
-        onNavigate={onNavigate} 
-        userData={userData} 
-        onLogout={onLogout} 
+      <Sidebar
+        activePage={activePage}
+        onNavigate={onNavigate}
+        userData={userData}
+        onLogout={onLogout}
       />
 
-      {/* Main Content */}
       <main className="main-content">
         {/* Top Bar */}
         <div className="top-bar">
-          <h1>My Patients</h1>
+          <h1>Patients</h1>
           <div className="top-bar-actions">
-            
             <div className="search-container">
-              <input type="text" placeholder="Search patients..." className="search-input" />
-             
+              <input
+                type="text"
+                placeholder="Search patients..."
+                className="search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
+            <button className="add-btn" onClick={handleAddPatient}>
+              + Add New Patient
+            </button>
           </div>
         </div>
 
-        {/* Patients Section */}
-        <div className="section patients-section">
-          <div className="section-header">
-            <div className="filters">
-              <label htmlFor="status-filter">Filter by status:</label>
-              <select 
-                id="status-filter" 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                {statuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-            
-            <button className="add-patient-btn">
-              <i className="icon add-icon"></i> Add New Patient
-            </button>
+        {/* Filters */}
+        <div className="filters-bar">
+          <div className="filter-group">
+            <label>Status:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="All">All Patients</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
           </div>
+          <div className="results-count">
+            Showing {filteredPatients.length} of {patients.length} patients
+          </div>
+        </div>
 
-          <div className="patients-table-container">
-            <table className="patients-table">
+        {/* Patients Table */}
+        <div className="section">
+          <div className="patients-table">
+            <table>
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Appointment Time</th>
+                  <th>Age</th>
+                  <th>Gender</th>
+                  <th>Blood Type</th>
+                  <th>Email</th>
+                  <th>Last Visit</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPatients.map(patient => (
-                  <tr key={patient.id} className={`status-${patient.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                    <td>
-                      <div className="patient-name">{patient.name}</div>
-                      <div className="patient-detail">Age: {patient.age} | {patient.condition}</div>
-                    </td>
-                    <td>{patient.appointmentTime}</td>
-                    <td>
-                      <span className={`status-badge ${patient.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                        {patient.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button className="view-btn">View</button>
-                        <button className="edit-btn">Edit</button>
-                      </div>
+                {filteredPatients.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="no-data">
+                      {searchQuery || statusFilter !== 'All'
+                        ? 'No patients found matching your criteria'
+                        : 'No patients yet. Click "Add New Patient" to get started.'}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredPatients.map((patient) => (
+                    <tr key={patient.id}>
+                      <td className="patient-name">{patient.name}</td>
+                      <td>{patient.age}</td>
+                      <td>{patient.gender}</td>
+                      <td>{patient.bloodType}</td>
+                      <td>{patient.email}</td>
+                      <td>{formatDate(patient.lastVisit)}</td>
+                      <td>
+                        <span className={`status-badge status-${patient.status.toLowerCase()}`}>
+                          {patient.status}
+                        </span>
+                      </td>
+                      <td className="action-buttons">
+                        <button
+                          className="action-btn view-btn"
+                          onClick={() => handleViewPatient(patient)}
+                          title="View Details"
+                        >
+                          View
+                        </button>
+                        <button
+                          className="action-btn edit-btn"
+                          onClick={() => handleEditPatient(patient)}
+                          title="Edit Patient"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="action-btn delete-btn"
+                          onClick={() => handleDeletePatient(patient)}
+                          title="Delete Patient"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-
-          <div className="pagination">
-            <button className="pagination-btn">&lt; Previous</button>
-            <div className="page-numbers">
-              <button className="page-btn active">1</button>
-              <button className="page-btn">2</button>
-              <button className="page-btn">3</button>
-            </div>
-            <button className="pagination-btn">Next &gt;</button>
-          </div>
         </div>
       </main>
+
+      {/* Add Patient Modal */}
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add New Patient"
+        size="large"
+      >
+        <form onSubmit={handleSubmitAdd} className="patient-form">
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Full Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                placeholder="Enter patient name"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Age *</label>
+              <input
+                type="number"
+                name="age"
+                value={formData.age}
+                onChange={handleInputChange}
+                required
+                min="0"
+                max="150"
+                placeholder="Age"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Gender *</label>
+              <select name="gender" value={formData.gender} onChange={handleInputChange}>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Blood Type *</label>
+              <select name="bloodType" value={formData.bloodType} onChange={handleInputChange}>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>NPI Number *</label>
+              <input
+                type="text"
+                name="npi"
+                value={formData.npi}
+                onChange={handleInputChange}
+                required
+                placeholder="10-digit NPI"
+                maxLength="10"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Email *</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+                placeholder="patient@email.com"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Phone</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Address</label>
+              <input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                placeholder="Street address, City, State, ZIP"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Medical History</label>
+              <textarea
+                name="medicalHistory"
+                value={formData.medicalHistory}
+                onChange={handleInputChange}
+                rows="3"
+                placeholder="Brief medical history..."
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Allergies</label>
+              <input
+                type="text"
+                name="allergies"
+                value={formData.allergies}
+                onChange={handleInputChange}
+                placeholder="Comma-separated list (e.g., Penicillin, Latex)"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Current Medications</label>
+              <input
+                type="text"
+                name="currentMedications"
+                value={formData.currentMedications}
+                onChange={handleInputChange}
+                placeholder="Comma-separated list (e.g., Aspirin 81mg, Lisinopril 10mg)"
+              />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary">
+              Add Patient
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Patient Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Edit Patient"
+        size="large"
+      >
+        <form onSubmit={handleSubmitEdit} className="patient-form">
+          <div className="form-grid">
+            {/* Same form fields as Add Modal */}
+            <div className="form-group">
+              <label>Full Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Age *</label>
+              <input
+                type="number"
+                name="age"
+                value={formData.age}
+                onChange={handleInputChange}
+                required
+                min="0"
+                max="150"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Gender *</label>
+              <select name="gender" value={formData.gender} onChange={handleInputChange}>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Blood Type *</label>
+              <select name="bloodType" value={formData.bloodType} onChange={handleInputChange}>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>NPI Number *</label>
+              <input
+                type="text"
+                name="npi"
+                value={formData.npi}
+                onChange={handleInputChange}
+                required
+                maxLength="10"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Email *</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Phone</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Address</label>
+              <input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Medical History</label>
+              <textarea
+                name="medicalHistory"
+                value={formData.medicalHistory}
+                onChange={handleInputChange}
+                rows="3"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Allergies</label>
+              <input
+                type="text"
+                name="allergies"
+                value={formData.allergies}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Current Medications</label>
+              <input
+                type="text"
+                name="currentMedications"
+                value={formData.currentMedications}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary">
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* View Patient Modal */}
+      <Modal
+        isOpen={showViewModal}
+        onClose={() => setShowViewModal(false)}
+        title="Patient Details"
+        size="large"
+      >
+        {selectedPatient && (
+          <div className="patient-details">
+            <div className="details-grid">
+              <div className="detail-item">
+                <label>Full Name:</label>
+                <span>{selectedPatient.name}</span>
+              </div>
+              <div className="detail-item">
+                <label>Age:</label>
+                <span>{selectedPatient.age} years</span>
+              </div>
+              <div className="detail-item">
+                <label>Gender:</label>
+                <span>{selectedPatient.gender}</span>
+              </div>
+              <div className="detail-item">
+                <label>Blood Type:</label>
+                <span>{selectedPatient.bloodType}</span>
+              </div>
+              <div className="detail-item">
+                <label>NPI Number:</label>
+                <span>{selectedPatient.npi}</span>
+              </div>
+              <div className="detail-item">
+                <label>Email:</label>
+                <span>{selectedPatient.email}</span>
+              </div>
+              <div className="detail-item">
+                <label>Phone:</label>
+                <span>{selectedPatient.phone || 'N/A'}</span>
+              </div>
+              <div className="detail-item">
+                <label>Status:</label>
+                <span className={`status-badge status-${selectedPatient.status.toLowerCase()}`}>
+                  {selectedPatient.status}
+                </span>
+              </div>
+              <div className="detail-item full-width">
+                <label>Address:</label>
+                <span>{selectedPatient.address || 'N/A'}</span>
+              </div>
+              <div className="detail-item full-width">
+                <label>Medical History:</label>
+                <span>{selectedPatient.medicalHistory || 'No medical history recorded'}</span>
+              </div>
+              <div className="detail-item full-width">
+                <label>Allergies:</label>
+                <span>
+                  {selectedPatient.allergies && selectedPatient.allergies.length > 0
+                    ? selectedPatient.allergies.join(', ')
+                    : 'No known allergies'}
+                </span>
+              </div>
+              <div className="detail-item full-width">
+                <label>Current Medications:</label>
+                <span>
+                  {selectedPatient.currentMedications && selectedPatient.currentMedications.length > 0
+                    ? selectedPatient.currentMedications.join(', ')
+                    : 'No current medications'}
+                </span>
+              </div>
+              <div className="detail-item">
+                <label>Last Visit:</label>
+                <span>{formatDate(selectedPatient.lastVisit)}</span>
+              </div>
+              <div className="detail-item">
+                <label>Next Appointment:</label>
+                <span>{formatDate(selectedPatient.nextAppointment)}</span>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowViewModal(false)}>
+                Close
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setShowViewModal(false);
+                  handleEditPatient(selectedPatient);
+                }}
+              >
+                Edit Patient
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={confirmDelete}
+        title="Delete Patient"
+        message={`Are you sure you want to delete ${selectedPatient?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };
