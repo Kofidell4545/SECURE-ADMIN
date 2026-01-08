@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar/SideBar';
-import dataService from '../../services/dataService';
+import apiService from '../../services/apiService';
+import { useToast } from '../../context/ToastContext';
 import './Dashboard.css';
 
 const Dashboard = ({ onLogout, onNavigate, activePage }) => {
@@ -11,28 +12,35 @@ const Dashboard = ({ onLogout, onNavigate, activePage }) => {
     pendingReports: 0
   });
   const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { showError } = useToast();
 
-  // Placeholder data for dashboard
-  const userData = {
-    name: "Nhyiraba David",
-    role: "Doctor",
-    email: "davidnhyiraba@gmail.com",
-  };
+  // Get user data from localStorage
+  const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
   // Load dashboard data
   useEffect(() => {
-    const loadDashboardData = () => {
-      // Get stats from dataService
-      const dashboardStats = dataService.dashboard.getStats();
-      setStats(dashboardStats);
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
 
-      // Get recent activity
-      const activity = dataService.dashboard.getRecentActivity();
-      setRecentActivity(activity);
+        // Get stats from API
+        const dashboardStats = await apiService.dashboard.getStats();
+        setStats(dashboardStats);
+
+        // Get recent activity
+        const activity = await apiService.dashboard.getRecentActivity();
+        setRecentActivity(activity);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        showError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadDashboardData();
-  }, []);
+  }, [showError]);
 
   // Format time ago
   const formatTimeAgo = (dateString) => {

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
+import apiService from '../../services/apiService';
 import logo from "../../assets/images/logo.svg";
 import './LoginPage.css';
 
 const LoginPage = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const { showSuccess, showError } = useToast();
@@ -14,42 +16,39 @@ const LoginPage = ({ onLogin }) => {
     setError('');
 
     // Validation
-    if (!username.trim()) {
-      setError('Please enter your NPI or email address');
-      showError('Please enter your NPI or email address');
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
+      showError('Please enter both email and password');
       return;
     }
 
-    // Simple email/NPI validation
+    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const npiRegex = /^\d{10}$/;
-
-    if (!emailRegex.test(username) && !npiRegex.test(username)) {
-      setError('Please enter a valid email address or 10-digit NPI');
-      showError('Please enter a valid email address or 10-digit NPI');
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      showError('Please enter a valid email address');
       return;
     }
 
-    // Simulate API call
     setIsLoading(true);
 
     try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call real API
+      const response = await apiService.auth.login(email, password);
 
-      // In a real application, you would validate credentials here
-      console.log('Login attempt with:', username);
+      if (response.success) {
+        showSuccess(`Welcome back, ${response.user.name}!`);
 
-      // Show success message
-      showSuccess('Login successful! Welcome to SECURE.');
-
-      // Call the onLogin function to update state in parent component
-      setTimeout(() => {
-        onLogin();
-      }, 500);
+        // Call the onLogin function to update state in parent component
+        setTimeout(() => {
+          onLogin();
+        }, 500);
+      }
     } catch (err) {
-      showError('Login failed. Please try again.');
-      setError('An error occurred. Please try again.');
+      console.error('Login error:', err);
+      const errorMessage = err.response?.data?.error || 'Login failed. Please check your credentials.';
+      showError(errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -66,19 +65,36 @@ const LoginPage = ({ onLogin }) => {
         <p>Log in to continue to Secure.</p>
 
         <form onSubmit={handleSubmit}>
-          <label htmlFor="username">NPI or email address*</label>
+          <label htmlFor="email">Email address*</label>
           <input
-            type="text"
-            id="username"
-            value={username}
+            type="email"
+            id="email"
+            value={email}
             onChange={(e) => {
-              setUsername(e.target.value);
+              setEmail(e.target.value);
               setError(''); // Clear error on input change
             }}
             disabled={isLoading}
             className={error ? 'input-error' : ''}
-            placeholder="Enter your NPI or email"
+            placeholder="Enter your email"
+            autoComplete="email"
           />
+
+          <label htmlFor="password">Password*</label>
+          <input
+            type="password"
+            id="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(''); // Clear error on input change
+            }}
+            disabled={isLoading}
+            className={error ? 'input-error' : ''}
+            placeholder="Enter your password"
+            autoComplete="current-password"
+          />
+
           {error && <p className="error-message">{error}</p>}
 
           <button
