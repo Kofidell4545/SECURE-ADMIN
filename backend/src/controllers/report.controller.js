@@ -5,6 +5,7 @@ const AppError = require('../utils/AppError');
 const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
+const { reportFabric, accessLogFabric } = require('../services/fabric');
 
 // Get all reports
 exports.getAllReports = async (req, res, next) => {
@@ -53,6 +54,14 @@ exports.getReport = async (req, res, next) => {
             return next(new AppError('Report not found', 404));
         }
 
+        // Log access on blockchain
+        accessLogFabric.logAccess({
+            userId: req.user?.id || 'system',
+            action: 'VIEW_REPORT',
+            resourceType: 'report',
+            resourceId: report.id
+        }).catch(err => logger.warn('Failed to log access on blockchain:', err.message));
+
         res.json({
             success: true,
             data: report
@@ -83,9 +92,33 @@ exports.createReport = async (req, res, next) => {
             reportData.fileSize = req.file.size;
         }
 
+        // 1. Create in PostgreSQL
         const report = await Report.create(reportData);
 
         logger.info(`Report created: ${report.title} for patient ${patient.name}`);
+
+        // 2. Store on blockchain with file hash (if file exists)
+        if (req.file) {
+            reportFabric.createReport(
+                {
+                    id: report.id,
+                    patientId: report.patientId,
+                    title: report.title,
+                    category: report.category,
+                    date: report.date,
+                    author: report.author
+                },
+                req.file.path // Calculate hash from file
+            ).catch(err => logger.warn('Failed to create report on blockchain:', err.message));
+        }
+
+        // 3. Log access on blockchain
+        accessLogFabric.logAccess({
+            userId: req.user?.id || 'system',
+            action: 'CREATE_REPORT',
+            resourceType: 'report',
+            resourceId: report.id
+        }).catch(err => logger.warn('Failed to log access on blockchain:', err.message));
 
         res.status(201).json({
             success: true,
@@ -143,6 +176,26 @@ exports.downloadReport = async (req, res, next) => {
             return next(new AppError('Report file not found', 404));
         }
 
+        // Verify file integrity before download
+        if (report.fileUrl) {
+            const verification = await reportFabric.verifyFileIntegrity(
+                report.id,
+                report.fileUrl
+            ).catch(err => {
+                logger.warn('File integrity check failed:', err.message);
+                return { verified: false, reason: 'Blockchain unavailable' };
+            });
+
+            // If blockchain is available and verification failed, alert user
+            if (verification && !verification.verified && verification.reason !== 'Blockchain unavailable') {
+                logger.error(`File integrity compromised for report ${report.id}`);
+                return next(new AppError(
+                    'File integrity check failed! This file may have been tampered with.',
+                    400
+                ));
+            }
+        }
+
         // Set headers for file download
         res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
         res.setHeader('Content-Type', 'application/octet-stream');
@@ -152,6 +205,14 @@ exports.downloadReport = async (req, res, next) => {
         fileStream.pipe(res);
 
         logger.info(`Report downloaded: ${report.title}`);
+
+        // Log download on blockchain
+        accessLogFabric.logAccess({
+            userId: req.user?.id || 'system',
+            action: 'DOWNLOAD_REPORT',
+            resourceType: 'report',
+            resourceId: report.id
+        }).catch(err => logger.warn('Failed to log access on blockchain:', err.message));
     } catch (error) {
         logger.error('Download report error:', error);
         next(error);

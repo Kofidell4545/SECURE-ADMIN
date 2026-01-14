@@ -1,6 +1,7 @@
 const Patient = require('../models/Patient');
 const logger = require('../utils/logger');
 const { Op } = require('sequelize');
+const { patientFabric, accessLogFabric } = require('../services/fabric');
 
 // Get all patients
 exports.getAllPatients = async (req, res) => {
@@ -50,6 +51,14 @@ exports.getPatient = async (req, res) => {
             return res.status(404).json({ error: 'Patient not found' });
         }
 
+        // Log access on blockchain
+        accessLogFabric.logAccess({
+            userId: req.user?.id || 'system',
+            action: 'VIEW_PATIENT',
+            resourceType: 'patient',
+            resourceId: patient.id
+        }).catch(err => logger.warn('Failed to log access on blockchain:', err.message));
+
         res.json({
             success: true,
             data: patient
@@ -63,9 +72,26 @@ exports.getPatient = async (req, res) => {
 // Create patient
 exports.createPatient = async (req, res) => {
     try {
+        // 1. Create in PostgreSQL (for fast queries)
         const patient = await Patient.create(req.body);
 
         logger.info(`Patient created: ${patient.name}`);
+
+        // 2. Store immutable record on blockchain
+        patientFabric.createPatient({
+            id: patient.id,
+            npi: patient.npi,
+            name: patient.name,
+            bloodType: patient.bloodType
+        }).catch(err => logger.warn('Failed to create patient on blockchain:', err.message));
+
+        // 3. Log access on blockchain
+        accessLogFabric.logAccess({
+            userId: req.user?.id || 'system',
+            action: 'CREATE_PATIENT',
+            resourceType: 'patient',
+            resourceId: patient.id
+        }).catch(err => logger.warn('Failed to log access on blockchain:', err.message));
 
         res.status(201).json({
             success: true,
@@ -91,9 +117,24 @@ exports.updatePatient = async (req, res) => {
             return res.status(404).json({ error: 'Patient not found' });
         }
 
+        // 1. Update in PostgreSQL
         await patient.update(req.body);
 
         logger.info(`Patient updated: ${patient.name}`);
+
+        // 2. Update on blockchain with history tracking
+        patientFabric.updatePatient(patient.id, {
+            name: patient.name,
+            bloodType: patient.bloodType
+        }).catch(err => logger.warn('Failed to update patient on blockchain:', err.message));
+
+        // 3. Log access on blockchain
+        accessLogFabric.logAccess({
+            userId: req.user?.id || 'system',
+            action: 'UPDATE_PATIENT',
+            resourceType: 'patient',
+            resourceId: patient.id
+        }).catch(err => logger.warn('Failed to log access on blockchain:', err.message));
 
         res.json({
             success: true,
