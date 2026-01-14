@@ -1,0 +1,25 @@
+{
+  "name": "ehr-contract",
+  "version": "1.0.0",
+  "description": "Smart contracts for SECURE EHR system",
+  "main": "index.js",
+  "scripts": {
+    "start": "fabric-chaincode-node start",
+    "test": "mocha --recursive"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.0",
+    "fabric-shim": "^2.5.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0",
+    "sinon": "^15.0.0"
+  },
+  "author": "SECURE EHR Team",
+  "license": "Apache-2.0"
+}
