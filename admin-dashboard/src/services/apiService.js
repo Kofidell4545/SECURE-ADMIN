@@ -125,6 +125,35 @@ const apiService = {
             return response.data.data;
         },
 
+        addWithFile: async (formData) => {
+            const response = await api.post('/reports', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            return response.data.data;
+        },
+
+        download: async (id) => {
+            const response = await api.get(`/reports/${id}/download`, {
+                responseType: 'blob',
+            });
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            // Get filename from Content-Disposition header or use default
+            const contentDisposition = response.headers['content-disposition'];
+            const filename = contentDisposition
+                ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+                : 'report.pdf';
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        },
+
         delete: async (id) => {
             const response = await api.delete(`/reports/${id}`);
             return response.data.success;

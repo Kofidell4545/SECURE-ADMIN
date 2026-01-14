@@ -3,6 +3,8 @@ const Patient = require('../models/Patient');
 const logger = require('../utils/logger');
 const AppError = require('../utils/AppError');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
 
 // Get all reports
 exports.getAllReports = async (req, res, next) => {
@@ -70,7 +72,18 @@ exports.createReport = async (req, res, next) => {
             return next(new AppError('Patient not found', 404));
         }
 
-        const report = await Report.create(req.body);
+        // Prepare report data
+        const reportData = { ...req.body };
+
+        // Handle file upload if present
+        if (req.file) {
+            reportData.fileName = req.file.originalname;
+            reportData.fileType = path.extname(req.file.originalname).substring(1);
+            reportData.fileUrl = req.file.path;
+            reportData.fileSize = req.file.size;
+        }
+
+        const report = await Report.create(reportData);
 
         logger.info(`Report created: ${report.title} for patient ${patient.name}`);
 
@@ -80,6 +93,10 @@ exports.createReport = async (req, res, next) => {
         });
     } catch (error) {
         logger.error('Create report error:', error);
+        // Delete uploaded file if report creation fails
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
         next(error);
     }
 };
@@ -93,6 +110,12 @@ exports.deleteReport = async (req, res, next) => {
             return next(new AppError('Report not found', 404));
         }
 
+        // Delete associated file if exists
+        if (report.fileUrl && fs.existsSync(report.fileUrl)) {
+            fs.unlinkSync(report.fileUrl);
+            logger.info(`Deleted file: ${report.fileUrl}`);
+        }
+
         await report.destroy();
 
         logger.info(`Report deleted: ${report.title}`);
@@ -103,6 +126,34 @@ exports.deleteReport = async (req, res, next) => {
         });
     } catch (error) {
         logger.error('Delete report error:', error);
+        next(error);
+    }
+};
+
+// Download report file
+exports.downloadReport = async (req, res, next) => {
+    try {
+        const report = await Report.findByPk(req.params.id);
+
+        if (!report) {
+            return next(new AppError('Report not found', 404));
+        }
+
+        if (!report.fileUrl || !fs.existsSync(report.fileUrl)) {
+            return next(new AppError('Report file not found', 404));
+        }
+
+        // Set headers for file download
+        res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+
+        // Stream the file
+        const fileStream = fs.createReadStream(report.fileUrl);
+        fileStream.pipe(res);
+
+        logger.info(`Report downloaded: ${report.title}`);
+    } catch (error) {
+        logger.error('Download report error:', error);
         next(error);
     }
 };

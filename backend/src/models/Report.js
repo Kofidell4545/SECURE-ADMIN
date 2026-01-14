@@ -45,6 +45,10 @@ const Report = sequelize.define('Report', {
         type: DataTypes.TEXT,
         field: 'file_url'
     },
+    fileSize: {
+        type: DataTypes.INTEGER,
+        field: 'file_size'
+    },
     notes: {
         type: DataTypes.TEXT
     }

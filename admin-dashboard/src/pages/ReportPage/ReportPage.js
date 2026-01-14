@@ -32,6 +32,7 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     fileType: 'pdf',
     notes: '',
   });
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const { showSuccess, showError } = useToast();
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -129,10 +130,25 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     }
 
     try {
-      const newReport = await apiService.report.add(formData);
+      // Create FormData for file upload
+      const submitData = new FormData();
+      submitData.append('patientId', formData.patientId);
+      submitData.append('title', formData.title);
+      submitData.append('category', formData.category);
+      submitData.append('date', formData.date);
+      submitData.append('author', formData.author);
+      if (formData.notes) {
+        submitData.append('notes', formData.notes);
+      }
+      if (selectedFile) {
+        submitData.append('file', selectedFile);
+      }
+
+      const newReport = await apiService.report.addWithFile(submitData);
       showSuccess(`Report "${newReport.title}" uploaded successfully`);
       await loadReports();
       setShowUploadModal(false);
+      setSelectedFile(null);
     } catch (error) {
       console.error('Upload error:', error);
       showError(error.response?.data?.error || 'Failed to upload report');
@@ -150,13 +166,23 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('image') ? 'image' : 'text';
+      setSelectedFile(file);
+      const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('image') ? 'image' : 'document';
       setFormData(prev => ({
         ...prev,
         fileName: file.name,
         fileType: fileType,
         title: prev.title || file.name.replace(/\.[^/.]+$/, "")
       }));
+    }
+  };
+
+  const handleDownloadReport = async (reportId) => {
+    try {
+      await apiService.report.download(reportId);
+    } catch (error) {
+      console.error('Download error:', error);
+      showError('Failed to download report');
     }
   };
 
@@ -474,9 +500,14 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
               <button className="btn-secondary" onClick={() => setShowViewModal(false)}>
                 Close
               </button>
-              <button className="btn-primary">
-                Download
-              </button>
+              {selectedReport.fileName && (
+                <button
+                  className="btn-primary"
+                  onClick={() => handleDownloadReport(selectedReport.id)}
+                >
+                  Download
+                </button>
+              )}
             </div>
           </div>
         )}
