@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar/SideBar';
 import apiService from '../../services/apiService';
 import { useToast } from '../../context/ToastContext';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import './Dashboard.css';
 
 const Dashboard = ({ onLogout, onNavigate, activePage }) => {
@@ -41,6 +42,10 @@ const Dashboard = ({ onLogout, onNavigate, activePage }) => {
 
     loadDashboardData();
   }, [showError]);
+
+  if (loading) {
+    return <LoadingSpinner fullPage size="large" text="Loading Dashboard..." />;
+  }
 
   // Format time ago
   const formatTimeAgo = (dateString) => {

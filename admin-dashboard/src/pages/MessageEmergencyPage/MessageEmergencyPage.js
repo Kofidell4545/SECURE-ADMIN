@@ -3,19 +3,19 @@ import Sidebar from '../../components/Sidebar/SideBar';
 import Modal from '../../components/Modal/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import { useToast } from '../../context/ToastContext';
-import dataService from '../../services/dataService';
+import apiService from '../../services/apiService';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+import useDebounce from '../../hooks/useDebounce';
 import './MessageEmergencyPage.css';
 
 const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
-  const userData = {
-    name: "Nhyiraba David",
-    role: "Doctor",
-    email: "davidnhyiraba@gmail.com",
-  };
+  // Get user data from localStorage
+  const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
   const [transfers, setTransfers] = useState([]);
   const [patients, setPatients] = useState([]);
   const [filteredTransfers, setFilteredTransfers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showNewModal, setShowNewModal] = useState(false);
@@ -35,26 +35,29 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
   });
 
   const { showSuccess, showError } = useToast();
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Load data on mount
-  useEffect(() => {
-    loadTransfers();
-    loadPatients();
-  }, []);
-
-  // Filter transfers when search or filter changes
-  useEffect(() => {
-    filterTransfers();
-  }, [transfers, searchQuery, statusFilter]);
-
-  const loadTransfers = () => {
-    const allTransfers = dataService.transfer.getAll();
-    setTransfers(allTransfers);
+  const loadTransfers = async () => {
+    try {
+      setLoading(true);
+      const allTransfers = await apiService.transfer.getAll();
+      setTransfers(allTransfers);
+    } catch (error) {
+      console.error('Failed to load transfers:', error);
+      showError('Failed to load transfers');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadPatients = () => {
-    const allPatients = dataService.patient.getAll();
-    setPatients(allPatients);
+  const loadPatients = async () => {
+    try {
+      const allPatients = await apiService.patient.getAll();
+      setPatients(allPatients);
+    } catch (error) {
+      console.error('Failed to load patients:', error);
+      showError('Failed to load patients');
+    }
   };
 
   const filterTransfers = () => {
@@ -66,10 +69,10 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
     }
 
     // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(t => {
-        const patient = dataService.patient.getById(t.patientId);
+        const patient = patients.find(p => p.id === t.patientId);
         return (
           (patient && patient.name.toLowerCase().includes(query)) ||
           t.toHospital.toLowerCase().includes(query) ||
@@ -80,6 +83,21 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
 
     setFilteredTransfers(filtered);
   };
+
+  // Load data on mount
+  useEffect(() => {
+    loadTransfers();
+    loadPatients();
+  }, []);
+
+  // Filter transfers when search or filter changes
+  useEffect(() => {
+    filterTransfers();
+  }, [transfers, debouncedSearchQuery, statusFilter]);
+
+  if (loading && transfers.length === 0) {
+    return <LoadingSpinner fullPage size="large" text="Loading Transfers..." />;
+  }
 
   const handleNewTransfer = () => {
     setFormData({
@@ -110,17 +128,18 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
     setShowDenyDialog(true);
   };
 
-  const confirmApprove = () => {
+  const confirmApprove = async () => {
     if (selectedTransfer) {
-      const updated = dataService.transfer.updateStatus(
-        selectedTransfer.id,
-        'Approved',
-        userData.name
-      );
-      if (updated) {
+      try {
+        await apiService.transfer.updateStatus(
+          selectedTransfer.id,
+          'Approved',
+          userData.name
+        );
         showSuccess(`Transfer for patient approved successfully`);
-        loadTransfers();
-      } else {
+        await loadTransfers();
+      } catch (error) {
+        console.error('Approve error:', error);
         showError('Failed to approve transfer');
       }
     }
@@ -128,17 +147,18 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
     setSelectedTransfer(null);
   };
 
-  const confirmDeny = () => {
+  const confirmDeny = async () => {
     if (selectedTransfer) {
-      const updated = dataService.transfer.updateStatus(
-        selectedTransfer.id,
-        'Denied',
-        userData.name
-      );
-      if (updated) {
+      try {
+        await apiService.transfer.updateStatus(
+          selectedTransfer.id,
+          'Denied',
+          userData.name
+        );
         showSuccess(`Transfer for patient denied`);
-        loadTransfers();
-      } else {
+        await loadTransfers();
+      } catch (error) {
+        console.error('Deny error:', error);
         showError('Failed to deny transfer');
       }
     }
@@ -146,7 +166,7 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
     setSelectedTransfer(null);
   };
 
-  const handleSubmitTransfer = (e) => {
+  const handleSubmitTransfer = async (e) => {
     e.preventDefault();
 
     // Validate required fields
@@ -155,10 +175,15 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
       return;
     }
 
-    const newTransfer = dataService.transfer.add(formData);
-    showSuccess(`${formData.type} request created successfully`);
-    loadTransfers();
-    setShowNewModal(false);
+    try {
+      const newTransfer = await apiService.transfer.add(formData);
+      showSuccess(`${formData.type} request created successfully`);
+      await loadTransfers();
+      setShowNewModal(false);
+    } catch (error) {
+      console.error('Create transfer error:', error);
+      showError(error.response?.data?.error || 'Failed to create transfer');
+    }
   };
 
   const handleInputChange = (e) => {
@@ -170,7 +195,7 @@ const MessageEmergencyPage = ({ onLogout, onNavigate, activePage }) => {
   };
 
   const getPatientName = (patientId) => {
-    const patient = dataService.patient.getById(patientId);
+    const patient = patients.find(p => p.id === patientId);
     return patient ? patient.name : 'Unknown Patient';
   };
 

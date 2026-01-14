@@ -14,7 +14,9 @@ function AppContent() {
   // Initialize state from localStorage or use defaults
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const savedLoginState = localStorage.getItem('isLoggedIn');
-    return savedLoginState === 'true';
+    const token = localStorage.getItem('token');
+    // User is logged in if both the flag is set AND a token exists
+    return savedLoginState === 'true' && !!token;
   });
 
   const [activePage, setActivePage] = useState(() => {
@@ -68,9 +70,11 @@ function AppContent() {
     setIsLoggedIn(false);
     setActivePage('dashboard');
     setShowTimeoutWarning(false);
-    // Clear localStorage on logout
+    // Clear all auth data from localStorage
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('activePage');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   const handleSessionTimeout = () => {

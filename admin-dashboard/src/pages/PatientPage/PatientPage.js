@@ -3,18 +3,17 @@ import Sidebar from '../../components/Sidebar/SideBar';
 import Modal from '../../components/Modal/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import { useToast } from '../../context/ToastContext';
-import dataService from '../../services/dataService';
+import apiService from '../../services/apiService';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+import useDebounce from '../../hooks/useDebounce';
 import './PatientPage.css';
 
 const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
-  const userData = {
-    name: "Nhyiraba David",
-    role: "Doctor",
-    email: "davidnhyiraba@gmail.com",
-  };
+  const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
   const [patients, setPatients] = useState([]);
   const [filteredPatients, setFilteredPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,20 +36,21 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
   });
 
   const { showSuccess, showError } = useToast();
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Load patients on mount
-  useEffect(() => {
-    loadPatients();
-  }, []);
 
-  // Filter patients when search or filter changes
-  useEffect(() => {
-    filterPatients();
-  }, [patients, searchQuery, statusFilter]);
 
-  const loadPatients = () => {
-    const allPatients = dataService.patient.getAll();
-    setPatients(allPatients);
+  const loadPatients = async () => {
+    try {
+      setLoading(true);
+      const allPatients = await apiService.patient.getAll();
+      setPatients(allPatients);
+    } catch (error) {
+      console.error('Failed to load patients:', error);
+      showError('Failed to load patients');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterPatients = () => {
@@ -62,8 +62,8 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
     }
 
     // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(query) ||
         p.email.toLowerCase().includes(query) ||
@@ -73,6 +73,20 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
 
     setFilteredPatients(filtered);
   };
+
+  // Load patients on mount
+  useEffect(() => {
+    loadPatients();
+  }, []);
+
+  // Filter patients when search or filter changes
+  useEffect(() => {
+    filterPatients();
+  }, [patients, debouncedSearchQuery, statusFilter]);
+
+  if (loading && patients.length === 0) {
+    return <LoadingSpinner fullPage size="large" text="Loading Patients..." />;
+  }
 
   const handleAddPatient = () => {
     setFormData({
@@ -119,13 +133,14 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedPatient) {
-      const success = dataService.patient.delete(selectedPatient.id);
-      if (success) {
+      try {
+        await apiService.patient.delete(selectedPatient.id);
         showSuccess(`Patient ${selectedPatient.name} deleted successfully`);
-        loadPatients();
-      } else {
+        await loadPatients();
+      } catch (error) {
+        console.error('Delete error:', error);
         showError('Failed to delete patient');
       }
     }
@@ -133,7 +148,7 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
     setSelectedPatient(null);
   };
 
-  const handleSubmitAdd = (e) => {
+  const handleSubmitAdd = async (e) => {
     e.preventDefault();
 
     // Validate required fields
@@ -148,17 +163,21 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
       age: parseInt(formData.age),
       allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()) : [],
       currentMedications: formData.currentMedications ? formData.currentMedications.split(',').map(m => m.trim()) : [],
-      lastVisit: new Date().toISOString(),
-      nextAppointment: null,
+      status: 'Active',
     };
 
-    const newPatient = dataService.patient.add(patientData);
-    showSuccess(`Patient ${newPatient.name} added successfully`);
-    loadPatients();
-    setShowAddModal(false);
+    try {
+      const newPatient = await apiService.patient.add(patientData);
+      showSuccess(`Patient ${newPatient.name} added successfully`);
+      await loadPatients();
+      setShowAddModal(false);
+    } catch (error) {
+      console.error('Add patient error:', error);
+      showError(error.response?.data?.error || 'Failed to add patient');
+    }
   };
 
-  const handleSubmitEdit = (e) => {
+  const handleSubmitEdit = async (e) => {
     e.preventDefault();
 
     if (!formData.name || !formData.age || !formData.email || !formData.npi) {
@@ -173,12 +192,13 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
       currentMedications: formData.currentMedications ? formData.currentMedications.split(',').map(m => m.trim()) : [],
     };
 
-    const updated = dataService.patient.update(selectedPatient.id, updates);
-    if (updated) {
+    try {
+      const updated = await apiService.patient.update(selectedPatient.id, updates);
       showSuccess(`Patient ${updated.name} updated successfully`);
-      loadPatients();
+      await loadPatients();
       setShowEditModal(false);
-    } else {
+    } catch (error) {
+      console.error('Update patient error:', error);
       showError('Failed to update patient');
     }
   };
@@ -686,20 +706,6 @@ const PatientsPage = ({ onLogout, onNavigate, activePage }) => {
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowViewModal(false)}>
-                Close
-              </button>
-              <button
-                className="btn-primary"
-                onClick={() => {
-                  setShowViewModal(false);
-                  handleEditPatient(selectedPatient);
-                }}
-              >
-                Edit Patient
-              </button>
-            </div>
           </div>
         )}
       </Modal>

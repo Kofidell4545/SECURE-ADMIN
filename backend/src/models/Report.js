@@ -52,7 +52,6 @@ const Report = sequelize.define('Report', {
     tableName: 'reports',
     timestamps: true,
     underscored: true,
-    createdAt: 'created_at',
     updatedAt: false
 });
 

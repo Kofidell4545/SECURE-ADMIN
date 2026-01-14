@@ -1,10 +1,11 @@
 const Report = require('../models/Report');
 const Patient = require('../models/Patient');
 const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
 const { Op } = require('sequelize');
 
 // Get all reports
-exports.getAllReports = async (req, res) => {
+exports.getAllReports = async (req, res, next) => {
     try {
         const { search, category, patientId } = req.query;
 
@@ -37,17 +38,17 @@ exports.getAllReports = async (req, res) => {
         });
     } catch (error) {
         logger.error('Get reports error:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 };
 
 // Get single report
-exports.getReport = async (req, res) => {
+exports.getReport = async (req, res, next) => {
     try {
         const report = await Report.findByPk(req.params.id);
 
         if (!report) {
-            return res.status(404).json({ error: 'Report not found' });
+            return next(new AppError('Report not found', 404));
         }
 
         res.json({
@@ -56,17 +57,17 @@ exports.getReport = async (req, res) => {
         });
     } catch (error) {
         logger.error('Get report error:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 };
 
 // Create report
-exports.createReport = async (req, res) => {
+exports.createReport = async (req, res, next) => {
     try {
         // Verify patient exists
         const patient = await Patient.findByPk(req.body.patientId);
         if (!patient) {
-            return res.status(404).json({ error: 'Patient not found' });
+            return next(new AppError('Patient not found', 404));
         }
 
         const report = await Report.create(req.body);
@@ -79,17 +80,17 @@ exports.createReport = async (req, res) => {
         });
     } catch (error) {
         logger.error('Create report error:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 };
 
 // Delete report
-exports.deleteReport = async (req, res) => {
+exports.deleteReport = async (req, res, next) => {
     try {
         const report = await Report.findByPk(req.params.id);
 
         if (!report) {
-            return res.status(404).json({ error: 'Report not found' });
+            return next(new AppError('Report not found', 404));
         }
 
         await report.destroy();
@@ -102,6 +103,6 @@ exports.deleteReport = async (req, res) => {
         });
     } catch (error) {
         logger.error('Delete report error:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 };

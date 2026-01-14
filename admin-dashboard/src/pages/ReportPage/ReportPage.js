@@ -3,18 +3,18 @@ import Sidebar from '../../components/Sidebar/SideBar';
 import Modal from '../../components/Modal/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import { useToast } from '../../context/ToastContext';
-import dataService from '../../services/dataService';
+import apiService from '../../services/apiService';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+import useDebounce from '../../hooks/useDebounce';
 import './ReportPage.css';
 
 const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
-  const userData = {
-    name: "Nhyiraba David",
-    role: "Doctor",
-    email: "davidnhyiraba@gmail.com",
-  };
+  // Get user data from localStorage
+  const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
   const [patients, setPatients] = useState([]);
   const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +34,7 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
   });
 
   const { showSuccess, showError } = useToast();
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Report categories
   const categories = [
@@ -45,21 +46,38 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     'Specialty Reports'
   ];
 
+  const loadPatients = async () => {
+    try {
+      const allPatients = await apiService.patient.getAll();
+      setPatients(allPatients);
+    } catch (error) {
+      console.error('Failed to load patients:', error);
+      showError('Failed to load patients');
+    }
+  };
+
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      const allReports = await apiService.report.getAll();
+      setReports(allReports);
+    } catch (error) {
+      console.error('Failed to load reports:', error);
+      showError('Failed to load reports');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load data on mount
   useEffect(() => {
     loadPatients();
     loadReports();
   }, []);
 
-  const loadPatients = () => {
-    const allPatients = dataService.patient.getAll();
-    setPatients(allPatients);
-  };
-
-  const loadReports = () => {
-    const allReports = dataService.report.getAll();
-    setReports(allReports);
-  };
+  if (loading && reports.length === 0) {
+    return <LoadingSpinner fullPage size="large" text="Loading Reports..." />;
+  }
 
   const handleUploadReport = (patient = null) => {
     setFormData({
@@ -86,13 +104,14 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedReport) {
-      const success = dataService.report.delete(selectedReport.id);
-      if (success) {
+      try {
+        await apiService.report.delete(selectedReport.id);
         showSuccess('Report deleted successfully');
-        loadReports();
-      } else {
+        await loadReports();
+      } catch (error) {
+        console.error('Delete error:', error);
         showError('Failed to delete report');
       }
     }
@@ -100,7 +119,7 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     setSelectedReport(null);
   };
 
-  const handleSubmitReport = (e) => {
+  const handleSubmitReport = async (e) => {
     e.preventDefault();
 
     // Validate required fields
@@ -109,10 +128,15 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
       return;
     }
 
-    const newReport = dataService.report.add(formData);
-    showSuccess(`Report "${newReport.title}" uploaded successfully`);
-    loadReports();
-    setShowUploadModal(false);
+    try {
+      const newReport = await apiService.report.add(formData);
+      showSuccess(`Report "${newReport.title}" uploaded successfully`);
+      await loadReports();
+      setShowUploadModal(false);
+    } catch (error) {
+      console.error('Upload error:', error);
+      showError(error.response?.data?.error || 'Failed to upload report');
+    }
   };
 
   const handleInputChange = (e) => {
@@ -137,7 +161,7 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
   };
 
   const getPatientName = (patientId) => {
-    const patient = dataService.patient.getById(patientId);
+    const patient = patients.find(p => p.id === patientId);
     return patient ? patient.name : 'Unknown Patient';
   };
 
@@ -156,8 +180,8 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
     }
 
     // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(r => {
         const patientName = getPatientName(r.patientId).toLowerCase();
         return (
@@ -451,7 +475,7 @@ const ReportsPage = ({ onLogout, onNavigate, activePage }) => {
                 Close
               </button>
               <button className="btn-primary">
-                Download Report
+                Download
               </button>
             </div>
           </div>
