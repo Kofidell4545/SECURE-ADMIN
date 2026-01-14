@@ -1,0 +1,73 @@
+# Docker Compose for Certificate Authorities
+# Generates cryptographic materials for all organizations
+
+version: '3.7'
+
+networks:
+  ehr-network:
+    name: ehr-network
+
+services:
+  ca-hospital:
+    image: hyperledger/fabric-ca:1.5.5
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-hospital
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=7054
+    ports:
+      - "7054:7054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ../organizations/hospital/ca:/etc/hyperledger/fabric-ca-server
+    container_name: ca.hospital.ehr.com
+    networks:
+      - ehr-network
+
+  ca-clinic:
+    image: hyperledger/fabric-ca:1.5.5
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-clinic
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=8054
+    ports:
+      - "8054:8054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ../organizations/clinic/ca:/etc/hyperledger/fabric-ca-server
+    container_name: ca.clinic.ehr.com
+    networks:
+      - ehr-network
+
+  ca-lab:
+    image: hyperledger/fabric-ca:1.5.5
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-lab
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=9054
+    ports:
+      - "9054:9054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ../organizations/lab/ca:/etc/hyperledger/fabric-ca-server
+    container_name: ca.lab.ehr.com
+    networks:
+      - ehr-network
+
+  ca-orderer:
+    image: hyperledger/fabric-ca:1.5.5
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-orderer
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=10054
+    ports:
+      - "10054:10054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ../organizations/orderer/ca:/etc/hyperledger/fabric-ca-server
+    container_name: ca.orderer.ehr.com
+    networks:
+      - ehr-network

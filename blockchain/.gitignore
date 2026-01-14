@@ -1,0 +1,34 @@
+# Hyperledger Fabric artifacts
+bin/
+config/
+fabric-samples/
+
+# Crypto materials (generated)
+organizations/*/ca/
+organizations/*/msp/
+organizations/*/peers/
+organizations/*/users/
+organizations/*/orderers/
+organizations/*/tlsca/
+
+# Channel artifacts (generated)
+channel-artifacts/*.block
+channel-artifacts/*.tx
+
+# Chaincode packages
+chaincode/*/node_modules/
+chaincode/*/*.tar.gz
+chaincode/*/package-lock.json
+
+# Application wallet
+application/*/wallet/*
+!application/*/wallet/.gitkeep
+
+# Logs
+*.log
+
+# Docker volumes
+docker/volumes/
+
+# System files
+.DS_Store
