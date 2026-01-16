@@ -8,11 +8,13 @@ const PatientContract = require('./lib/patient-contract');
 const ReportContract = require('./lib/report-contract');
 const TransferContract = require('./lib/transfer-contract');
 const AccessLogContract = require('./lib/access-log-contract');
+const ConsentContract = require('./lib/consent-contract');
 
 module.exports.PatientContract = PatientContract;
 module.exports.ReportContract = ReportContract;
 module.exports.TransferContract = TransferContract;
 module.exports.AccessLogContract = AccessLogContract;
+module.exports.ConsentContract = ConsentContract;
 
 module.exports.contracts = [
     PatientContract,

@@ -28,6 +28,7 @@ app.use('/api/patients', require('./routes/patient.routes'));
 app.use('/api/reports', require('./routes/report.routes'));
 app.use('/api/transfers', require('./routes/transfer.routes'));
 app.use('/api/audit', require('./routes/audit.routes'));
+app.use('/api/consent', require('./routes/consent.routes'));
 
 // Health check
 app.get('/health', (req, res) => {
