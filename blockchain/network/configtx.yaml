@@ -1,0 +1,187 @@
+# Channel Configuration for Hyperledger Fabric
+# Defines organizations, policies, and channel parameters
+
+---
+Organizations:
+  - &OrdererOrg
+      Name: OrdererMSP
+      ID: OrdererMSP
+      MSPDir: organizations/orderer/msp
+      Policies:
+        Readers:
+          Type: Signature
+          Rule: "OR('OrdererMSP.member')"
+        Writers:
+          Type: Signature
+          Rule: "OR('OrdererMSP.member')"
+        Admins:
+          Type: Signature
+          Rule: "OR('OrdererMSP.admin')"
+      OrdererEndpoints:
+        - orderer0.ehr.com:7050
+        - orderer1.ehr.com:8050
+        - orderer2.ehr.com:9050
+
+  - &Hospital
+      Name: HospitalMSP
+      ID: HospitalMSP
+      MSPDir: organizations/hospital/msp
+      Policies:
+        Readers:
+          Type: Signature
+          Rule: "OR('HospitalMSP.admin', 'HospitalMSP.peer', 'HospitalMSP.client')"
+        Writers:
+          Type: Signature
+          Rule: "OR('HospitalMSP.admin', 'HospitalMSP.client')"
+        Admins:
+          Type: Signature
+          Rule: "OR('HospitalMSP.admin')"
+        Endorsement:
+          Type: Signature
+          Rule: "OR('HospitalMSP.peer')"
+      AnchorPeers:
+        - Host: peer0.hospital.ehr.com
+          Port: 7051
+
+  - &Clinic
+      Name: ClinicMSP
+      ID: ClinicMSP
+      MSPDir: organizations/clinic/msp
+      Policies:
+        Readers:
+          Type: Signature
+          Rule: "OR('ClinicMSP.admin', 'ClinicMSP.peer', 'ClinicMSP.client')"
+        Writers:
+          Type: Signature
+          Rule: "OR('ClinicMSP.admin', 'ClinicMSP.client')"
+        Admins:
+          Type: Signature
+          Rule: "OR('ClinicMSP.admin')"
+        Endorsement:
+          Type: Signature
+          Rule: "OR('ClinicMSP.peer')"
+      AnchorPeers:
+        - Host: peer0.clinic.ehr.com
+          Port: 9051
+
+  - &Lab
+      Name: LabMSP
+      ID: LabMSP
+      MSPDir: organizations/lab/msp
+      Policies:
+        Readers:
+          Type: Signature
+          Rule: "OR('LabMSP.admin', 'LabMSP.peer', 'LabMSP.client')"
+        Writers:
+          Type: Signature
+          Rule: "OR('LabMSP.admin', 'LabMSP.client')"
+        Admins:
+          Type: Signature
+          Rule: "OR('LabMSP.admin')"
+        Endorsement:
+          Type: Signature
+          Rule: "OR('LabMSP.peer')"
+      AnchorPeers:
+        - Host: peer0.lab.ehr.com
+          Port: 10051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer0.ehr.com:7050
+    - orderer1.ehr.com:8050
+    - orderer2.ehr.com:9050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer0.ehr.com
+        Port: 7050
+        ClientTLSCert: organizations/orderer/orderers/orderer0.ehr.com/tls/server.crt
+        ServerTLSCert: organizations/orderer/orderers/orderer0.ehr.com/tls/server.crt
+      - Host: orderer1.ehr.com
+        Port: 8050
+        ClientTLSCert: organizations/orderer/orderers/orderer1.ehr.com/tls/server.crt
+        ServerTLSCert: organizations/orderer/orderers/orderer1.ehr.com/tls/server.crt
+      - Host: orderer2.ehr.com
+        Port: 9050
+        ClientTLSCert: organizations/orderer/orderers/orderer2.ehr.com/tls/server.crt
+        ServerTLSCert: organizations/orderer/orderers/orderer2.ehr.com/tls/server.crt
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  ThreeOrgsApplicationGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Hospital
+        - *Clinic
+        - *Lab
+      Capabilities: *ApplicationCapabilities

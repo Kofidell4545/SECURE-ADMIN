@@ -1,0 +1,36 @@
+# Crypto Configuration for Certificate Generation
+# Defines the structure for all organizations
+
+OrdererOrgs:
+  - Name: Orderer
+    Domain: ehr.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer0
+      - Hostname: orderer1
+      - Hostname: orderer2
+
+PeerOrgs:
+  - Name: Hospital
+    Domain: hospital.ehr.com
+    EnableNodeOUs: true
+    Template:
+      Count: 2
+    Users:
+      Count: 2
+
+  - Name: Clinic
+    Domain: clinic.ehr.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+    Users:
+      Count: 2
+
+  - Name: Lab
+    Domain: lab.ehr.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+    Users:
+      Count: 2
