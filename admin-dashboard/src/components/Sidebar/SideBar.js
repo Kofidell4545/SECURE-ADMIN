@@ -1,5 +1,6 @@
 import React from 'react';
 import logo from "../../assets/images/logo.svg";
+import { BlockchainStatusBadge } from '../Blockchain';
 import './Sidebar.css';
 
 const Sidebar = ({ activePage, onNavigate, userData, onLogout }) => {
@@ -75,6 +76,7 @@ const Sidebar = ({ activePage, onNavigate, userData, onLogout }) => {
         </ul>
       </nav>
       <div className="sidebar-footer">
+        <BlockchainStatusBadge />
         <div className="user-profile">
           <div className="user-avatar">
             {userData.name.split(' ').map(name => name[0]).join('')}

@@ -239,6 +239,24 @@ const apiService = {
             }));
         },
     },
+
+    // Audit & Blockchain
+    audit: {
+        getAuditTrail: async (resourceId) => {
+            const response = await api.get(`/audit/trail/${resourceId}`);
+            return response.data;
+        },
+
+        getPatientHistory: async (patientId) => {
+            const response = await api.get(`/audit/patient/${patientId}/history`);
+            return response.data;
+        },
+
+        getBlockchainStatus: async () => {
+            const response = await api.get('/audit/blockchain/status');
+            return response.data;
+        },
+    },
 };
 
 export default apiService;
